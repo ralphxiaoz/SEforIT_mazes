@@ -53,7 +53,7 @@ class Maze
 				return false
 			else
 				temp_maze = []
-				@maze_matrix.clear
+				@maze_matrix.clear # 
 				@mazes[0].each {|row| temp_maze.push(row.split(""))}
 				@maze_matrix = temp_maze.map{|row| row.map {|e| e.to_i}}
 			end
@@ -65,13 +65,7 @@ class Maze
 	# prints a diagram of the maze on the console. 
 	# "|" starnds for wall, "o" stands for empty space, "*" stands for the cursor
 	def display
-		display_maze = @maze_matrix.map { |row| row.map do |e|
-																	if e != "*"
-																		e == 1 ? "|" : "o"
-																	else
-																		"*"
-																	end
-																end }
+		display_maze = @maze_matrix.map { |row| row.map  {|e| e == "*" ? "*" : e == 1 ? "|" : "o" }}
 		display_maze.each {|row| print "#{row.join}\n"}
 		puts
 	end
@@ -114,8 +108,8 @@ class Maze
 	end
 
 	# determines if there’s a way to walk from a specified beginning position to a specified ending position
-	# if there is, return the path coordinates
-	# if no, return false
+	# if there is, return the array of path coordinates
+	# if no, return empty array
 	def solve(begX, begY, endX, endY)
 		start_point = Point.new(cell2coor(begX, begY), nil)
 		ending_point = Point.new(cell2coor(endX, endY), nil)
@@ -136,39 +130,46 @@ class Maze
 			end
 		end
 
-		# after BFS, reset the maze to its original form
-		@maze_matrix = original_matrix
-		puts "after bfs:"
-		print @maze_matrix
-		print original_matrix
+		# after BFS, erase the traces in process of BFS
+		erase_trace
 		
 		# display the trace if show_trace set true
-		if exit_reached && @show_trace
-			path = []
+		if exit_reached
+			solution_path = []
 			while point.parent
-				print "#{point.coor}\n"
-				path.push(point.coor)
+				solution_path.push(point.coor)
 				point = point.parent
 			end
-			path.reverse!
-			puts "length: #{path.length}"
-			path.each do |coor|
-				@maze_matrix[coor.first][coor.last] = "*"
-				# display
-			end
-			@maze_matrix = original_matrix
+			solution_path.push(start_point.coor)
+			solution_path.reverse!
+			erase_trace
+			return solution_path
+		else
+			return []
 		end
 	end
 
-	def trace()
-		@show_trace = true
+	def trace(begX, begY, endX, endY)
+		solution = solve(begX, begY, endX, endY)
+		if !solution.empty?
+			solution.each do |coor|
+				@maze_matrix[coor.first][coor.last] = "*"
+				display
+				sleep(0.5)
+			end
+		else
+			puts "This maze cannot be solved."
+		end
+		erase_trace
 	end	
 
-	def clear_maze
+	# erase the trace during BFS, converting all "*" to 0
+	def erase_trace
 		@maze_matrix.each do |row|
 			row.each do |e|
-				e.to_s.gsub!("*", )
+				e.to_s.gsub!("*", "0")
 			end
+			row.map!(&:to_i)
 		end
 	end
 
@@ -185,5 +186,4 @@ end
 maze = Maze.new(4,4)
 maze.gen_maze("#{File.dirname(__FILE__)}/maze_string")
 
-maze.trace
-maze.solve(0,0,3,3)
+maze.trace(0,0,3,3)
