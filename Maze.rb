@@ -1,4 +1,4 @@
-require "#{File.dirname(__FILE__)}/MazeVerification.rb"
+require "#{File.dirname(__FILE__)}/Loader.rb"
 
 class Maze
 	# r rows, c columns
@@ -14,51 +14,32 @@ class Maze
 		(0...(2*r+1)).each do |i|
 			@maze_matrix.push(row)
 		end
-	end	
+	end
 
 	# return the maze using a string of ones and zeros
 	# if the string can form more than 1 possible mazes, result stored in a 2-d array
 	# return false if the string cannot form a valid maze
-	def load(num_string)
-		facs = MazeVerification.find_odd_factors(num_string.size)
-		return false if facs == []
-		facs.each do |comb|
-			rows = MazeVerification.devide_maze(num_string, comb)
-			err = false
-			rows.each_with_index do |row, index|
-				if index == 0 || index == rows.length - 1
-					if !MazeVerification.valid_row?(row, "border")
-						err = true
-						break
-					end
-				else
-					if !MazeVerification.valid_row?(row)
-						err = true
-						break
-					end
-				end
-			end
-			@mazes.push(rows) if !err
-		end
-		return @mazes
-	end
-
+	# def load(num_string)
+	# 	@mazes = Loader.load_file(num_string)
+	# end
 	def gen_maze(file_path = nil)
 		if file_path != nil
-			load(open(file_path).read.chomp)
-			if @mazes.size > 1
-				puts "In this case, the string can generate more than one maze. Not implemented."
-			elsif @mazes.size == 0
-				puts "invalid maze string. File not loaded."
-				return false
-			else
-				temp_maze = []
-				@maze_matrix.clear # 
-				@mazes[0].each {|row| temp_maze.push(row.split(""))}
-				@maze_matrix = temp_maze.map{|row| row.map {|e| e.to_i}}
-			end
+			gen_from_file(file_path)
 		else
 			puts "Generate a random maze. Not implemented."
+		end
+	end
+
+	def gen_from_file(file_path)
+		@mazes = Loader.load_file(file_path)
+		# load(open(file_path).read.chomp)
+		if @mazes.size > 1
+			puts "In this case, the string can generate more than one maze. Not implemented."
+		elsif @mazes.size == 0
+			puts "invalid maze string. File not loaded."
+			return false
+		else
+			@maze_matrix = @mazes[0]
 		end
 	end
 
