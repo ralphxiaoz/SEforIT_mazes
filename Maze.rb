@@ -3,16 +3,19 @@ require "#{File.dirname(__FILE__)}/Loader.rb"
 class Maze
 	# r rows, c columns
 	def initialize(r, c)
+		@num_row = r
+		@num_colum = c
 		@show_trace = false
 		@maze_matrix = []
-		@maze_matrix_size = [r, c]
+		@maze_size = [r, c]
 		@mazes = []
+		sep = Array.new(2*c+1){1}
 		row = []
 		(0...(2*c+1)).each do |i|
-			row.push(1)
+			row.push(i.even? ? 1 : 0)
 		end
 		(0...(2*r+1)).each do |i|
-			@maze_matrix.push(row)
+			@maze_matrix.push(i.even? ? sep : row)
 		end
 	end
 
@@ -26,13 +29,62 @@ class Maze
 		if file_path != nil
 			gen_from_file(file_path)
 		else
-			puts "Generate a random maze. Not implemented."
+			gen_random_maze
 		end
+	end
+
+	def gen_random_maze
+		start_point = Point.new([rand(@num_row), rand(@num_colum)], nil)
+	end
+
+	# check if any intact cells around certain coordinate
+	# if there are, go randomly into one cell
+	# set the past wall to 0
+	def go_random(coor)
+		dir = find_intact_cell(coor)
+		print "#{dir}\n"
+		go = 0
+		if dir.include?(0)
+			while dir[go] == 1
+				go = rand(3)
+			end
+			case go
+			when go == 0
+				set_coor_val(coor_adj(coor, "up"), 0)
+			when go == 1
+				set_coor_val(coor_adj(coor, "down"), 0)
+			when go == 2
+				set_coor_val(coor_adj(coor, "left"), 0)
+			when go == 3
+				set_coor_val(coor_adj(coor, "right"), 0)
+			end
+			puts go
+			return go
+		else
+			return nil
+		end
+	end
+
+
+
+	# find if there's a intact cell around certain coordinate
+	# return an array representing accessibility of adjacent cells
+	def find_intact_cell(coor)
+		dir = [1,1,1,1]
+		dir[0] = 0 if wall_intact?(cell_adj(coor, "up"))
+		dir[0] = 0 if wall_intact?(cell_adj(coor, "down"))
+		dir[0] = 0 if wall_intact?(cell_adj(coor, "left"))
+		dir[0] = 0 if wall_intact?(cell_adj(coor, "right"))
+		return dir
+	end
+
+	# return true if all walls around a coordinate are intact
+	def wall_intact?(coor)
+		return true if get_dir(coor) == [1,1,1,1]
 	end
 
 	def gen_from_file(file_path)
 		@mazes = Loader.load_file(file_path)
-		# load(open(file_path).read.chomp)
 		if @mazes.size > 1
 			puts "In this case, the string can generate more than one maze. Not implemented."
 		elsif @mazes.size == 0
@@ -61,6 +113,10 @@ class Maze
 		return @maze_matrix[coor.first][coor.last]
 	end
 
+	def set_coor_val(coor, val)
+		@maze_matrix[coor.first][coor.last] = val
+	end
+
 	# return the adjacent coordinate of a coordinate
 	def coor_adj(coor, dir)
 		case dir
@@ -72,6 +128,20 @@ class Maze
 			return [coor.first, coor.last - 1]
 		when "right" 
 			return [coor.first, coor.last + 1]
+		end
+	end
+
+	# return the adjacent cell of a coordinate
+	def cell_adj(coor, dir)
+		case dir
+		when "up"
+			return [coor.first - 2, coor.last] if coor.first - 2 > 0
+		when "down"
+			return [coor.first + 2, coor.last] if coor.first - 2 < 2 * @num_row + 1
+		when "left"
+			return [coor.first, coor.last - 2] if coor.last - 2 > 0
+		when "right"
+			return [coor.first, coor.last + 2] if coor.last + 2 < 2 * @num_colum + 1
 		end
 	end
 
@@ -165,6 +235,9 @@ class Point
 end
 
 maze = Maze.new(4,4)
-maze.gen_maze("#{File.dirname(__FILE__)}/maze_string")
-
-maze.trace(0,0,3,3)
+# maze.gen_maze("#{File.dirname(__FILE__)}/maze_string")
+maze.gen_maze()
+print "#{maze.cell_adj([1,1], "up")}\n"
+# maze.go_random([1,1])
+maze.display
+# maze.trace(0,0,3,3)

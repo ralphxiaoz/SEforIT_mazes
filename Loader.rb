@@ -65,7 +65,6 @@ module Loader
 
 	def Loader.load_file(file_path)
 		num_string = open(file_path).read.chomp
-		puts num_string
 		lh = LoaderHelper.new(num_string)
 		return lh.load_maze
 	end
