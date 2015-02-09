@@ -1,7 +1,9 @@
 require "#{File.dirname(__FILE__)}/Loader.rb"
+require 'pry-byebug'
 
 class Maze
 	# r rows, c columns
+	# initialize a r*c sized rectangular maze will all cells surrounded by 4 walls
 	def initialize(r, c)
 		@num_row = r
 		@num_colum = c
@@ -9,22 +11,20 @@ class Maze
 		@maze_matrix = []
 		@maze_size = [r, c]
 		@mazes = []
-		sep = Array.new(2*c+1){1}
-		row = []
-		(0...(2*c+1)).each do |i|
-			row.push(i.even? ? 1 : 0)
-		end
+		@start_point_coor = []
+		@ending_point_coor = []
 		(0...(2*r+1)).each do |i|
-			@maze_matrix.push(i.even? ? sep : row)
+			row = [] # must generate a new row instance every iteration since ruby passes by reference
+			(0...(2*c+1)).each do |k|
+				row.push(k.even? ? 1 : 0) 
+			end
+			@maze_matrix.push(i.even? ? Array.new(2*c+1){1} : row)
 		end
 	end
 
-	# return the maze using a string of ones and zeros
-	# if the string can form more than 1 possible mazes, result stored in a 2-d array
-	# return false if the string cannot form a valid maze
-	# def load(num_string)
-	# 	@mazes = Loader.load_file(num_string)
-	# end
+	# generate a maze
+	# if file_path is set, generate from file
+	# if not set, generate a random maze
 	def gen_maze(file_path = nil)
 		if file_path != nil
 			gen_from_file(file_path)
@@ -34,55 +34,74 @@ class Maze
 	end
 
 	def gen_random_maze
-		start_point = Point.new([rand(@num_row), rand(@num_colum)], nil)
+		@start_point_coor = cell2coor(rand(@num_row), rand(@num_colum))
+		# set_coor_val(start_coor, "*")
+		visited_cells = 0
+		visited_cells_stack = []
+		current_coor = @start_point_coor
+		while visited_cells < @num_colum * @num_row - 1
+			if find_intact_cell(current_coor).include?(0)
+				went = go_random(current_coor)
+				visited_cells_stack << current_coor
+				current_coor = cell_adj(current_coor, "up") if went == 0
+				current_coor = cell_adj(current_coor, "down") if went == 1
+				current_coor = cell_adj(current_coor, "left") if went == 2
+				current_coor = cell_adj(current_coor, "right") if went == 3
+				visited_cells += 1
+			else
+				current_coor = visited_cells_stack.pop
+			end
+		end
+		# last current_coor that has no empty cell around it is the ending point
+		@ending_point_coor = current_coor
+		# set_coor_val(ending_coor, "*")
+	end
+
+	def find_start_end_cell
+		return [coor2cell(@start_point_coor), coor2cell(@ending_point_coor)]
 	end
 
 	# check if any intact cells around certain coordinate
 	# if there are, go randomly into one cell
-	# set the past wall to 0
+	# set the path wall to 0
 	def go_random(coor)
 		dir = find_intact_cell(coor)
-		print "#{dir}\n"
 		go = 0
 		if dir.include?(0)
 			while dir[go] == 1
-				go = rand(3)
+				go = rand(4)
 			end
-			case go
-			when go == 0
-				set_coor_val(coor_adj(coor, "up"), 0)
-			when go == 1
-				set_coor_val(coor_adj(coor, "down"), 0)
-			when go == 2
-				set_coor_val(coor_adj(coor, "left"), 0)
-			when go == 3
-				set_coor_val(coor_adj(coor, "right"), 0)
-			end
-			puts go
+			set_coor_val(coor_adj(coor, "up"), 0) if go == 0
+			set_coor_val(coor_adj(coor, "down"), 0) if go == 1
+			set_coor_val(coor_adj(coor, "left"), 0) if go == 2
+			set_coor_val(coor_adj(coor, "right"), 0) if go == 3
 			return go
 		else
 			return nil
 		end
 	end
 
-
-
 	# find if there's a intact cell around certain coordinate
 	# return an array representing accessibility of adjacent cells
 	def find_intact_cell(coor)
 		dir = [1,1,1,1]
 		dir[0] = 0 if wall_intact?(cell_adj(coor, "up"))
-		dir[0] = 0 if wall_intact?(cell_adj(coor, "down"))
-		dir[0] = 0 if wall_intact?(cell_adj(coor, "left"))
-		dir[0] = 0 if wall_intact?(cell_adj(coor, "right"))
+		dir[1] = 0 if wall_intact?(cell_adj(coor, "down"))
+		dir[2] = 0 if wall_intact?(cell_adj(coor, "left"))
+		dir[3] = 0 if wall_intact?(cell_adj(coor, "right"))
 		return dir
 	end
 
 	# return true if all walls around a coordinate are intact
+	# if coor == [0, 0], then out of border, return false
 	def wall_intact?(coor)
+		return false if coor == [0, 0]
 		return true if get_dir(coor) == [1,1,1,1]
 	end
 
+	# return the maze using a string of ones and zeros
+	# if the string can form more than 1 possible mazes, result stored in a 2-d array
+	# return false if the string cannot form a valid maze
 	def gen_from_file(file_path)
 		@mazes = Loader.load_file(file_path)
 		if @mazes.size > 1
@@ -108,8 +127,13 @@ class Maze
 		return [2*r+1, 2*c+1]
 	end
 
+	def coor2cell(coor)
+		return [(coor.first - 1) / 2, (coor.last - 1) / 2]
+	end
+
 	# return the value of the coordinate
 	def get_coor_value(coor)
+		# puts "get_coor_value: #{@maze_matrix[coor.first][coor.last]}"
 		return @maze_matrix[coor.first][coor.last]
 	end
 
@@ -117,6 +141,7 @@ class Maze
 		@maze_matrix[coor.first][coor.last] = val
 	end
 
+	# didn't check border!!!
 	# return the adjacent coordinate of a coordinate
 	def coor_adj(coor, dir)
 		case dir
@@ -132,17 +157,19 @@ class Maze
 	end
 
 	# return the adjacent cell of a coordinate
+	# if out of border, return [0, 0]
 	def cell_adj(coor, dir)
 		case dir
 		when "up"
 			return [coor.first - 2, coor.last] if coor.first - 2 > 0
 		when "down"
-			return [coor.first + 2, coor.last] if coor.first - 2 < 2 * @num_row + 1
+			return [coor.first + 2, coor.last] if coor.first + 2 < 2 * @num_row + 1
 		when "left"
 			return [coor.first, coor.last - 2] if coor.last - 2 > 0
 		when "right"
 			return [coor.first, coor.last + 2] if coor.last + 2 < 2 * @num_colum + 1
 		end
+		return [0, 0]
 	end
 
 	# get the possible directions of a coordinate
@@ -155,6 +182,7 @@ class Maze
 		dir[1] = 0 if get_coor_value(coor_adj(coor, "down")) == 0
 		dir[2] = 0 if get_coor_value(coor_adj(coor, "left")) == 0
 		dir[3] = 0 if get_coor_value(coor_adj(coor, "right")) == 0
+		# puts "dir of #{coor} is : #{dir}"
 		return dir
 	end
 
@@ -202,11 +230,13 @@ class Maze
 
 	def trace(begX, begY, endX, endY)
 		solution = solve(begX, begY, endX, endY)
+		set_coor_val(cell2coor(begX, begY), "*") # set the begining and ending point as "*". Note, only modify this after maze is solved by solve()
+		set_coor_val(cell2coor(endX, endY), "*")
 		if !solution.empty?
 			solution.each do |coor|
 				@maze_matrix[coor.first][coor.last] = "*"
 				display
-				sleep(0.5)
+				sleep(0.1)
 			end
 		else
 			puts "This maze cannot be solved."
@@ -234,10 +264,17 @@ class Point
 	end
 end
 
-maze = Maze.new(4,4)
+maze = Maze.new(15,15)
+
+
+# ***TEST***
+# ------- Generate from file, unquote the code between -------
 # maze.gen_maze("#{File.dirname(__FILE__)}/maze_string")
-maze.gen_maze()
-print "#{maze.cell_adj([1,1], "up")}\n"
-# maze.go_random([1,1])
-maze.display
 # maze.trace(0,0,3,3)
+# ------- Generate from file, unquote the code between -------
+
+# ------- Generate random maze, unquote the code between -------
+maze.gen_maze()
+start_end = maze.find_start_end_cell
+maze.trace(start_end[0][0], start_end[0][1], start_end[1][0], start_end[1][1])
+# ------- Generate random maze, unquote the code between -------
